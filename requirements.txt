@@ -1,0 +1,13 @@
+pandas
+numpy
+duckdb
+streamlit
+plotly
+openpyxl
+rapidfuzz
+streamlit
+plotly
+python-docx
+reportlab
+groq
+docx2pdf
