@@ -1,116 +1,183 @@
 """
-AI Financial Intelligence Platform -- home page / upload entry point
+AI-POWERED FINANCIAL INTELLIGENCE PLATFORM - HOME & DASHBOARD
+Clean entry point connecting all modules, presenting key operational metrics,
+active company switcher, and audit lineage.
 """
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent))
-sys.path.append(str(Path(__file__).resolve().parent / "etl"))
-sys.path.append(str(Path(__file__).resolve().parent / "financial_model"))
-sys.path.append(str(Path(__file__).resolve().parent / "common"))
-
 import streamlit as st
 import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
-from etl.extract import extract_file
-from etl.transform import map_raw_dataframe, apply_mapping
-from etl.validate import run_all_validations, data_quality_score
-from etl.load import get_connection, ensure_schema, load_upload
-from financial_model.ratios import load_wide_from_db, compute_all_ratios, store_ratios
-from styles import load_custom_css, gradient_header, powerbi_kpi
-from data_quality import save_field_mapping
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
-st.set_page_config(page_title="AI Financial Intelligence Platform", layout="wide")
-load_custom_css()
-gradient_header(
-    "AI Financial Intelligence Platform",
-    "Upload a company's financial statement -- we'll clean, validate, and analyze it.",
+from app.core.config import settings
+from app.database.connection import db_manager
+from app.database.repositories import CompanyRepository, FinancialFactRepository, ValuationRepository
+from app.ui.components import load_terminal_theme, render_disclaimer
+
+st.set_page_config(
+    page_title="AI Financial Intelligence Platform",
+    page_icon="📈",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
+load_terminal_theme()
 
-conn = get_connection()
-ensure_schema(conn)
+# Sidebar: Global Context
+with st.sidebar:
+    st.title("🏦 Financial Platform")
+    st.caption("Institutional Financial Analytics & Valuation")
+    st.divider()
 
-if "pending_upload" not in st.session_state:
-    st.session_state.pending_upload = None
+    conn = db_manager.get_connection()
+    comp_repo = CompanyRepository(conn)
+    companies = comp_repo.list_all()
 
-st.subheader("1. Upload financial data")
-company_name = st.text_input("Company / Entity name", placeholder="e.g. Acme Corp")
-uploaded_file = st.file_uploader("Upload financial statement (CSV or Excel)", type=["csv", "xlsx", "xls"])
+    if not companies:
+        # Seed default company if empty
+        from app.schemas.financial import Company
+        default_co = Company(company_id="co_apple", name="Apple Inc.", ticker="AAPL", reporting_currency="USD")
+        comp_repo.create(default_co)
+        companies = [default_co]
 
-if uploaded_file is not None and company_name:
-    if st.button("Process upload", type="primary"):
-        raw_df = extract_file(uploaded_file)
-        mapping = map_raw_dataframe(raw_df)
-        clean_df = apply_mapping(raw_df, mapping)
+    company_options = {c.name: c.company_id for c in companies}
+    selected_name = st.selectbox("Active Company", list(company_options.keys()))
+    selected_company_id = company_options[selected_name]
 
-        st.session_state.pending_upload = {
-            "company_name": company_name,
-            "filename": uploaded_file.name,
-            "raw_df": raw_df,
-            "mapping": mapping,
-            "clean_df": clean_df,
-        }
-
-if st.session_state.pending_upload:
-    data = st.session_state.pending_upload
+    st.session_state["active_company_id"] = selected_company_id
+    st.session_state["active_company_name"] = selected_name
 
     st.divider()
-    st.subheader("2. Review field mapping")
+    st.caption("Environment: Development")
+    st.caption(f"DuckDB: {settings.resolved_db_path.name}")
 
-    exact = data["mapping"][data["mapping"]["match_type"] == "exact"]
-    auto = data["mapping"][data["mapping"]["match_type"] == "fuzzy_auto"]
-    suggest = data["mapping"][data["mapping"]["match_type"] == "fuzzy_suggest"]
-    unmatched = data["mapping"][data["mapping"]["match_type"] == "unmatched"]
+# Main Header
+st.title("📊 Executive Overview & Analysis")
+st.subheader(f"Entity Scope: {selected_name} ({selected_company_id})")
 
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: powerbi_kpi("Exact Matches", str(len(exact)))
-    with col2: powerbi_kpi("Auto-Matched", str(len(auto)))
-    with col3: powerbi_kpi("Needs Review", str(len(suggest)))
-    with col4: powerbi_kpi("Unmatched", str(len(unmatched)))
+# Fetch latest figures for selected company
+fact_repo = FinancialFactRepository(conn)
+val_repo = ValuationRepository(conn)
 
-    if not suggest.empty:
-        st.warning("These fields were fuzzy-matched with moderate confidence -- please review:")
-        st.dataframe(suggest[["raw_label", "canonical_field", "confidence"]], use_container_width=True, hide_index=True)
+facts = conn.execute(
+    """
+    SELECT f.canonical_item, f.period, f.normalized_value, f.normalized_currency
+    FROM financial_facts f
+    JOIN datasets d ON f.dataset_id = d.dataset_id
+    JOIN dataset_versions v ON f.dataset_id = v.dataset_id AND f.dataset_version = v.version
+    WHERE d.company_id = ? AND v.is_active = TRUE
+    ORDER BY f.period DESC
+    """,
+    [selected_company_id]
+).fetchdf()
 
-    if not unmatched.empty:
-        st.info("These labels could not be matched and will be excluded from analysis:")
-        st.dataframe(unmatched[["raw_label"]], use_container_width=True, hide_index=True)
+val_data = conn.execute(
+    """
+    SELECT vr.enterprise_value, vr.equity_value, vr.wacc, vr.terminal_growth_rate, vr.implied_share_price
+    FROM valuation_runs vr
+    JOIN datasets d ON vr.dataset_id = d.dataset_id
+    WHERE d.company_id = ?
+    ORDER BY vr.created_at DESC LIMIT 1
+    """,
+    [selected_company_id]
+).fetchone()
 
-    with st.expander("See full mapping detail"):
-        st.dataframe(data["mapping"], use_container_width=True, hide_index=True)
+# Render Top KPIs (Honest UI: empty state if not yet uploaded)
+kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 
-    st.divider()
-    st.subheader("3. Validate and confirm")
+if not facts.empty:
+    latest_period = facts["period"].iloc[0]
+    rev_fact = facts[facts["canonical_item"] == "revenue"]
+    latest_rev = rev_fact["normalized_value"].iloc[0] if not rev_fact.empty else 0.0
 
-    issues = run_all_validations(data["clean_df"])
-    score = data_quality_score(data["clean_df"], issues)
+    ebit_fact = facts[facts["canonical_item"] == "operating_income"]
+    latest_ebit = ebit_fact["normalized_value"].iloc[0] if not ebit_fact.empty else 0.0
 
-    col1, col2 = st.columns([1, 3])
-    with col1:
-        powerbi_kpi("Data Quality Score", f"{score['score']}/100")
-    with col2:
-        if issues.empty:
-            st.success("No validation issues found.")
-        else:
-            st.dataframe(issues, use_container_width=True, hide_index=True)
+    ev = val_data[0] if val_data else None
+    share_price = val_data[4] if val_data else None
 
-    if st.button("Confirm and save to warehouse", type="primary"):
-        upload_id = load_upload(conn, data["company_name"], data["filename"],
-                                 data["clean_df"], issues, score)
-        save_field_mapping(conn, upload_id, data["mapping"])
-
-        wide_df = load_wide_from_db(conn, upload_id)
-        ratios_df = compute_all_ratios(wide_df)
-        store_ratios(conn, upload_id, data["company_name"], ratios_df)
-
-        st.success(f"Saved! Upload ID: {upload_id}")
-        st.info("Go to the sidebar pages to view validation results, ratios, and more.")
-        st.session_state.pending_upload = None
+    with kpi1:
+        st.metric(f"Revenue ({latest_period})", f"${latest_rev:,.0f}")
+    with kpi2:
+        st.metric(f"Operating Income ({latest_period})", f"${latest_ebit:,.0f}")
+    with kpi3:
+        st.metric("DCF Enterprise Value", f"${ev:,.0f}" if ev else "Not Run")
+    with kpi4:
+        st.metric("Implied Share Price", f"${share_price:,.2f}" if share_price else "Not Run")
+else:
+    with kpi1:
+        st.metric("Revenue", "No Data")
+    with kpi2:
+        st.metric("Operating Income", "No Data")
+    with kpi3:
+        st.metric("Enterprise Value", "No Data")
+    with kpi4:
+        st.metric("Implied Share Price", "No Data")
 
 st.divider()
-st.subheader("Previously uploaded companies")
-from shared_utils import get_uploads_list
-uploads = get_uploads_list(conn)
-if uploads.empty:
-    st.info("No uploads yet -- upload a file above to get started.")
-else:
-    st.dataframe(uploads, use_container_width=True, hide_index=True)
+
+# Historical Visualizations
+col_chart1, col_chart2 = st.columns(2)
+
+with col_chart1:
+    st.markdown("### 📈 Revenue & Earnings History")
+    if not facts.empty:
+        trend_df = facts[facts["canonical_item"].isin(["revenue", "operating_income", "net_income"])].copy()
+        if not trend_df.empty:
+            fig = px.bar(
+                trend_df,
+                x="period",
+                y="normalized_value",
+                color="canonical_item",
+                barmode="group",
+                title=f"Historical Financials ({selected_name})",
+                labels={"normalized_value": "Amount (USD)", "period": "Period", "canonical_item": "Metric"},
+                template="plotly_dark",
+            )
+            fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No revenue or income statement items uploaded yet.")
+    else:
+        st.info("Upload statements on the 'Upload & Ingest' page to generate historical charts.")
+
+with col_chart2:
+    st.markdown("### 🔍 Data Quality & Compliance Status")
+    q_score = conn.execute(
+        """
+        SELECT vr.overall_quality_score, vr.completeness_score, vr.mapping_quality_score,
+               vr.accounting_consistency_score, vr.anomaly_severity_score
+        FROM validation_runs vr
+        JOIN datasets d ON vr.dataset_id = d.dataset_id
+        WHERE d.company_id = ?
+        ORDER BY vr.executed_at DESC LIMIT 1
+        """,
+        [selected_company_id]
+    ).fetchone()
+
+    if q_score:
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=q_score[0],
+            title={"text": "Overall Data Quality Score"},
+            gauge={
+                "axis": {"range": [0, 100]},
+                "bar": {"color": "#38BDF8"},
+                "steps": [
+                    {"range": [0, 40], "color": "#EF4444"},
+                    {"range": [40, 75], "color": "#F59E0B"},
+                    {"range": [75, 100], "color": "#10B981"},
+                ],
+            }
+        ))
+        fig_gauge.update_layout(paper_bgcolor="rgba(0,0,0,0)", font_color="#F8FAFC", height=320)
+        st.plotly_chart(fig_gauge, use_container_width=True)
+    else:
+        st.info("No data quality checks run yet for active company.")
+
+# Mandatory academic research disclaimer
+render_disclaimer()
