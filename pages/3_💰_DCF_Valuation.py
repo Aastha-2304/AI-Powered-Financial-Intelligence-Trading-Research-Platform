@@ -89,7 +89,7 @@ if not facts_df.empty:
 # Retrieve active forecast if available in session or database
 latest_fc = conn.execute(
     """
-    SELECT forecast_id, results_json FROM forecast_runs
+    SELECT forecast_id, results_json, assumption_set_id FROM forecast_runs
     WHERE dataset_id LIKE ? ORDER BY created_at DESC LIMIT 1
     """,
     [f"%{company_id}%"]
@@ -98,10 +98,12 @@ latest_fc = conn.execute(
 default_fcfs = [85_000_000.0, 92_000_000.0, 101_000_000.0, 110_000_000.0, 120_000_000.0]
 default_periods = ["2025", "2026", "2027", "2028", "2029"]
 active_fc_id = None
+active_assumption_id = None
 
 if latest_fc:
     import json
     active_fc_id = latest_fc[0]
+    active_assumption_id = latest_fc[2]
     fc_results = json.loads(latest_fc[1])
     default_fcfs = [float(p.get("free_cash_flow", 100_000_000)) for p in fc_results]
     default_periods = [str(p.get("period", f"Y{i+1}")) for i, p in enumerate(fc_results)]
@@ -254,23 +256,27 @@ with tab_dcf:
 
     # Save to warehouse button
     if st.button("💾 Save DCF Valuation Run to DuckDB Warehouse", type="primary", use_container_width=True):
-        val_id = f"val_{uuid.uuid4().hex[:12]}"
-        val_run = ValuationRun(
-            valuation_id=val_id,
-            dataset_id=active_dataset_id,
-            dataset_version=active_dataset_ver,
-            forecast_id=active_fc_id,
-            wacc=wacc,
-            terminal_growth_rate=g_rate,
-            enterprise_value=dcf_result.enterprise_value,
-            equity_value=dcf_result.equity_value,
-            implied_share_price=dcf_result.implied_share_price,
-            sensitivity_grid_json={},
-            scenarios_json={},
-        )
-        val_repo.save_valuation_run(val_run)
-        st.session_state["active_valuation_id"] = val_id
-        st.success(f"Valuation `{val_id}` successfully committed to DuckDB! Available in **6_📋_Reports**.")
+        if not active_fc_id:
+            st.error("Please run and save a forecast in 2_📈_Forecasting before saving valuation.")
+        else:
+            val_id = f"val_{uuid.uuid4().hex[:12]}"
+            val_run = ValuationRun(
+                valuation_id=val_id,
+                dataset_id=active_dataset_id,
+                dataset_version=active_dataset_ver,
+                forecast_id=active_fc_id,
+                assumption_set_id=active_assumption_id or "as_default",
+                wacc=wacc,
+                terminal_growth_rate=g_rate,
+                enterprise_value=dcf_result.enterprise_value,
+                equity_value=dcf_result.equity_value,
+                implied_share_price=dcf_result.implied_share_price,
+                sensitivity_grid_json={},
+                scenarios_json={},
+            )
+            val_repo.save_valuation_run(val_run)
+            st.session_state["active_valuation_id"] = val_id
+            st.success(f"Valuation `{val_id}` successfully committed to DuckDB! Available in **5_📑_Reports**.")
 
 # -------------------------------------------------------------
 # TAB 2: MULTI-SCENARIO & WHAT-IF ANALYSIS

@@ -276,6 +276,17 @@ with tab_forecast:
             ds_id = str(facts_df["dataset_id"].iloc[0])
             ds_ver = int(facts_df["dataset_version"].iloc[0])
 
+            fc_repo.save_assumption_set(
+                AssumptionSet(
+                    assumption_set_id=a_id,
+                    company_id=selected_company,
+                    version=1,
+                    source="user_input",
+                    is_approved=True,
+                    assumptions_json=drivers.model_dump(),
+                )
+            )
+
             fc_run = ForecastRun(
                 forecast_id=f_id,
                 dataset_id=ds_id,

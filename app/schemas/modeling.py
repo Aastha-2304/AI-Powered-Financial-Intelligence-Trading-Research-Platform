@@ -2,7 +2,7 @@
 Validation, forecasting, valuation, and report metadata schemas.
 """
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from pydantic import BaseModel, Field
 
 
@@ -55,10 +55,10 @@ class ForecastRun(BaseModel):
     forecast_id: str
     dataset_id: str
     dataset_version: int
-    assumption_set_id: str
+    assumption_set_id: str = "as_default"
     model_name: str  # driver_based, naive, exp_smoothing
     horizon_periods: int
-    results_json: Dict[str, Any]
+    results_json: Union[Dict[str, Any], List[Any]]
     backtest_metrics_json: Optional[Dict[str, Any]] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -69,14 +69,14 @@ class ValuationRun(BaseModel):
     dataset_id: str
     dataset_version: int
     forecast_id: str
-    assumption_set_id: str
+    assumption_set_id: str = "as_default"
     wacc: float
     terminal_growth_rate: float
     enterprise_value: float
     equity_value: float
     implied_share_price: Optional[float] = None
-    sensitivity_grid_json: Dict[str, Any]
-    scenarios_json: Dict[str, Any]
+    sensitivity_grid_json: Dict[str, Any] = Field(default_factory=dict)
+    scenarios_json: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
