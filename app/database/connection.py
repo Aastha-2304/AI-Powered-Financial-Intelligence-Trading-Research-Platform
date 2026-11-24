@@ -2,10 +2,43 @@
 DuckDB connection manager with transaction management.
 Provides thread-safe connections and schema initialization.
 """
-import duckdb
+import sys
 from pathlib import Path
 from typing import Optional
 from contextlib import contextmanager
+
+# Auto-detect and register project virtual environment site-packages
+# so dependencies (such as duckdb) import seamlessly across all Python runtimes.
+_MODULE_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _MODULE_DIR.parent.parent
+_VENV_CANDIDATES = [
+    _PROJECT_ROOT / "venv" / "Lib" / "site-packages",
+    _PROJECT_ROOT / ".venv" / "Lib" / "site-packages",
+    _PROJECT_ROOT.parent / "venv" / "Lib" / "site-packages",
+    _PROJECT_ROOT.parent / ".venv" / "Lib" / "site-packages",
+]
+for _site in _VENV_CANDIDATES:
+    if _site.exists() and str(_site) not in sys.path:
+        sys.path.insert(0, str(_site))
+
+try:
+    import duckdb
+except ImportError:
+    # Fallback: search recursively for duckdb package in parent directories
+    _found = False
+    for _p in _PROJECT_ROOT.parent.rglob("site-packages"):
+        if (_p / "duckdb").exists() and str(_p) not in sys.path:
+            sys.path.insert(0, str(_p))
+            _found = True
+            break
+    if _found:
+        import duckdb
+    else:
+        raise ImportError(
+            "DuckDB is required by the analytical warehouse. "
+            "Please ensure you run the application using the project virtual environment: "
+            ".\\venv\\Scripts\\streamlit.exe run 🏠_Home.py"
+        )
 
 from app.core.config import settings
 from app.core.logging import get_logger

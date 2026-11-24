@@ -1,9 +1,6 @@
-# AI-Powered Financial Intelligence Platform
+# AI-Powered Financial Intelligence & Trading Research Platform
 
-> **MCA Minor Project**  
-> **Student:** Aastha Setia (Roll No: 06214004425)  
-> **Institution:** Master of Computer Applications (MCA)  
-> **Status:** Production-Grade Complete · Auditable Local Workspace · 33 / 33 Tests Passing
+> **Status:** Production-Grade Complete · Auditable Local Workspace · 33 / 33 Tests Passing (100%)
 
 ---
 
@@ -52,15 +49,13 @@ AI-Financial-Intelligence/
 │   ├── workflow/            # LangGraph StateGraph & Human-in-the-Loop interrupt
 │   └── ui/                  # UI components, dark-mode styling & provenance badges
 ├── pages/                   # Multi-page Streamlit Application
-│   ├── 1_📥_Upload_and_Ingest.py
-│   ├── 2_🔍_Data_Quality.py
-│   ├── 3_📈_Forecasting.py
-│   ├── 4_💰_DCF_Valuation.py
-│   ├── 5_🤖_AI_Analyst.py
-│   ├── 6_📋_Reports.py
-│   ├── 7_⚙️_Settings_and_Audit.py
-│   └── 8_⚖️_Human_Approval_Center.py
-├── 🏠_Home.py               # Streamlit Executive Dashboard
+│   ├── 1_🔍_Data_Quality.py
+│   ├── 2_📈_Forecasting.py
+│   ├── 3_💰_DCF_Valuation.py
+│   ├── 4_🤖_AI_Analyst.py
+│   ├── 5_📋_Reports.py
+│   └── 6_⚙️_Settings_and_Audit.py
+├── 🏠_Home.py               # Streamlit Executive Dashboard & Statement Ingestion Hub
 ├── tests/
 │   ├── fixtures/            # Messy data fixtures (parentheses, billions, misalignments)
 │   ├── unit/                # Unit tests for all sub-engines (analyst, DCF, workflow, etc.)

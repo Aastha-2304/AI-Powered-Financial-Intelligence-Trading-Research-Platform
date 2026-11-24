@@ -81,3 +81,71 @@ def render_provenance_badge(source_file: str, row: int, period: str, version: in
         f'<span class="provenance-tag">Source: {source_file} (row {row}) | {period} | v{version}</span>',
         unsafe_allow_html=True,
     )
+
+
+def render_sidebar_company_selector(conn):
+    """
+    Standardizes sidebar company selection across all application pages.
+    Returns (active_company_id, active_company_name).
+    If no company has been uploaded/registered yet, returns (None, None).
+    """
+    from app.database.repositories import CompanyRepository
+    from app.schemas.financial import Company
+
+    comp_repo = CompanyRepository(conn)
+    companies = comp_repo.list_all()
+
+    with st.sidebar:
+        st.title("🏦 Financial Platform")
+        st.caption("Active Entity Scope")
+
+        if not companies:
+            st.info("No entity uploaded yet. Upload statements on Home screen to begin.")
+            selected_company_id = None
+            selected_name = None
+            st.session_state["active_company_id"] = None
+            st.session_state["active_company_name"] = None
+        else:
+            company_options = {c.name: c.company_id for c in companies}
+            names_list = list(company_options.keys())
+
+            # Pre-select from session state if available
+            current_active_id = st.session_state.get("active_company_id")
+            default_idx = 0
+            if current_active_id:
+                for i, name in enumerate(names_list):
+                    if company_options[name] == current_active_id:
+                        default_idx = i
+                        break
+
+            selected_name = st.selectbox("Company", names_list, index=default_idx, key="sidebar_company_select")
+            selected_company_id = company_options[selected_name]
+
+            st.session_state["active_company_id"] = selected_company_id
+            st.session_state["active_company_name"] = selected_name
+
+        # Option to create/register a new company
+        with st.expander("➕ Register New Entity"):
+            with st.form("new_company_form", clear_on_submit=True):
+                new_name = st.text_input("Company Name", placeholder="e.g. Microsoft Corp")
+                new_ticker = st.text_input("Ticker", placeholder="e.g. MSFT")
+                new_currency = st.selectbox("Currency", ["USD", "INR", "EUR", "GBP"])
+                if st.form_submit_button("Create Entity"):
+                    if new_name:
+                        new_id = f"co_{new_name.lower().replace(' ', '_')[:12]}"
+                        comp_repo.create(
+                            Company(
+                                company_id=new_id,
+                                name=new_name,
+                                ticker=new_ticker.upper() if new_ticker else None,
+                                reporting_currency=new_currency,
+                            )
+                        )
+                        st.session_state["active_company_id"] = new_id
+                        st.session_state["active_company_name"] = new_name
+                        st.success(f"Created {new_name}!")
+                        st.rerun()
+
+        st.divider()
+
+    return selected_company_id, selected_name

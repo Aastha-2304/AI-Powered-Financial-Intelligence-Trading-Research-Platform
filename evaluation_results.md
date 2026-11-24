@@ -81,17 +81,16 @@ This file records reproducible benchmark metrics evaluated directly over tested 
 ## 7. Module: Institutional UI & Review Experience (Streamlit)
 - **Evaluation Date**: 2026-10-28
 - **Frontend Architecture**: Multi-page Streamlit application connecting directly to DuckDB repositories and engine services
-- **Compiled Page Count**: 8 pages (1 Home dashboard + 7 dedicated functional pages)
-- **Syntax & Compilation Test**: 100% Pass across all 8 pages (`py_compile.compile`)
+- **Compiled Page Count**: 7 pages (1 Home dashboard & Ingestion Hub + 6 dedicated functional pages)
+- **Syntax & Compilation Test**: 100% Pass across all 7 pages (`py_compile.compile`)
 - **Key Modules**:
-  1. `🏠_Home.py`: Executive dashboard with financial KPIs, quality gauge, revenue/operating profit trend, and platform overview.
-  2. `pages/1_📥_Upload_and_Ingest.py`: File parser, fuzzy schema mapping with editable confidence table, human review decision logging, and DuckDB commit.
-  3. `pages/2_🔍_Data_Quality.py`: 4-dimension quality scorecard (Completeness 30%, Mapping 25%, Accounting 35%, Anomaly 10%), hard-failure cap (max 40), and detailed finding grid with source row provenance.
-  4. `pages/3_📈_Forecasting.py`: Driver-based assumptions sliders, projected three-statement tables, baseline model comparisons (Naive, Moving Avg, Holt's Linear), and backtesting metrics (MAPE, RMSE, MAE).
-  5. `pages/4_💰_DCF_Valuation.py`: WACC calculation, $WACC \le g$ mathematical guard, discounted cash flow bridge, $5 \times 5$ sensitivity heatmap, and scenario comparison (Base/Bull/Bear).
-  6. `pages/5_🤖_AI_Analyst.py`: Grounded AI Analyst chat interface with source citations, audit provenance, and interactive evidence bundle inspection.
-  7. `pages/6_📋_Reports.py`: Executive report generator producing downloadable institutional Word (.docx) and PDF dossiers with audit tracking.
-  8. `pages/7_⚙️_Settings_and_Audit.py`: System health, redacted configuration view, and comprehensive audit trail timeline.
+  1. `🏠_Home.py`: Executive dashboard & Statement Ingestion Hub with fuzzy schema matching, human review, financial KPIs, quality gauge, and revenue/operating profit trends.
+  2. `pages/1_🔍_Data_Quality.py`: 4-dimension quality scorecard (Completeness 30%, Mapping 25%, Accounting 35%, Anomaly 10%), hard-failure cap (max 40), and detailed finding grid with source row provenance.
+  3. `pages/2_📈_Forecasting.py`: Driver-based assumptions sliders, projected three-statement tables, baseline model comparisons (Naive, Moving Avg, Holt's Linear), and backtesting metrics (MAPE, RMSE, MAE).
+  4. `pages/3_💰_DCF_Valuation.py`: WACC calculation, $WACC \le g$ mathematical guard, discounted cash flow bridge, $5 \times 5$ sensitivity heatmap, and scenario comparison (Base/Bull/Bear).
+  5. `pages/4_🤖_AI_Analyst.py`: Grounded AI Analyst chat interface with source citations, audit provenance, and interactive evidence bundle inspection.
+  6. `pages/5_📋_Reports.py`: Executive report generator producing downloadable institutional Word (.docx) and PDF dossiers with audit tracking.
+  7. `pages/6_⚙️_Settings_and_Audit.py`: Company baseline requirements, system health, redacted configuration view, and comprehensive audit trail timeline.
 - **Mandatory Research Disclaimer**: Embedded permanently in sidebar and report outputs across all pages.
 - **Automated Test Suite Pass Rate**: 26 / 26 tests passing (100%).
 
@@ -116,5 +115,20 @@ This file records reproducible benchmark metrics evaluated directly over tested 
 - **Dataset Immutability Controls**: Enforced version lockdown via `PermissionError` in `AuthContext.authorize_dataset_access`.
 - **Secret Redaction**: Verified masking of Groq API keys (`gsk_...`) and HTTP `Bearer` tokens into `[REDACTED_SECRET]` via `SecretRedactingFormatter`.
 - **Final Platform Test Suite Pass Rate**: 33 / 33 passed (100% pass rate).
+
+---
+
+## 4. Module: DCF Valuation & Scenario Engine
+- **Evaluation Date**: 2026-10-28
+- **Benchmark Source**: Independent Manual Financial Analyst Spreadsheet Model
+- **WACC**: 10.00% | **Terminal Growth ($g$)**: 2.50% | **Debt**: $200.00M | **Cash**: $50.00M | **Shares**: 100.00M
+- **Mathematical Precondition Guard**: Verified rejection when $WACC \le g$.
+
+### Numerical Agreement Table:
+| Financial Metric | Spreadsheet Benchmark | Python Engine Output | Delta (Tolerance: 0.05) | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Enterprise Value (EV)** | $1,504.13M | $1,504.14M | 0.0100 | **MATCH** |
+| **Equity Value** | $1,354.13M | $1,354.14M | 0.0100 | **MATCH** |
+| **Implied Share Price** | $13.54 | $13.54 | 0.0000 | **MATCH** |
 
 ---
