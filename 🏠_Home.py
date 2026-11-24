@@ -55,10 +55,6 @@ comp_repo = CompanyRepository(conn)
 fact_repo = FinancialFactRepository(conn)
 val_repo = ValuationRepository(conn)
 
-with st.sidebar:
-    st.caption("Environment: Development")
-    st.caption(f"Warehouse: {settings.resolved_db_path.name}")
-
 st.title("🏦 Financial Intelligence & Valuation Platform")
 st.caption("Automated Data Ingestion, Accounting Validation, Driver Forecasting & Intrinsic DCF Valuation")
 

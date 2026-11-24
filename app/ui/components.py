@@ -67,12 +67,8 @@ def load_terminal_theme():
 
 
 def render_disclaimer():
-    """Renders mandatory academic research disclaimer."""
-    from app.core.constants import DISCLAIMER_TEXT
-    st.markdown(
-        f'<div class="disclaimer-banner"><b>Academic Disclaimer:</b> {DISCLAIMER_TEXT}</div>',
-        unsafe_allow_html=True,
-    )
+    """Hidden from frontend per user request."""
+    pass
 
 
 def render_provenance_badge(source_file: str, row: int, period: str, version: int):
